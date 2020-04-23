@@ -11,7 +11,7 @@ uses: azure/aks-set-context@v1
     id: login
 ```
 
-Refer to the action metadata file for details about all the inputs https://github.com/Azure/aks-set-context/blob/master/action.yml
+[Dummy Change] Refer to the action metadata file for details about all the inputs https://github.com/Azure/aks-set-context/blob/master/action.yml
 
 ## Azure credentials
 Run `az ad sp create-for-rbac --sdk-auth` to generate an Azure Active Directory service principals.
