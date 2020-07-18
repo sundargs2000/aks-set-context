@@ -4,8 +4,11 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { WebRequest, WebRequestOptions, WebResponse, sendRequest } from "./client";
 import * as querystring from 'querystring';
+import * as nonInteractiveLogin from './non-interactive-login';
 
-function getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl : string): Promise<string> {
+const isARCenabled = core.getInput('arc-enabled', { required: false }) === 'true' ? true : false;
+
+function getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl: string): Promise<string> {
 
     if (!servicePrincipalId || !servicePrincipalKey || !tenantId || !authorityUrl) {
         throw new Error("Not all values are present in the creds object. Ensure appId, password and tenant are supplied");
@@ -83,8 +86,6 @@ function getAKSKubeconfigForARC(azureSessionToken: string, subscriptionId: strin
         }
         sendRequest(webRequest).then((response: WebResponse) => {
             let kubeconfigs = response.body.kubeconfigs;
-            console.log('RESPONSE:');
-            console.log(kubeconfigs);
             if (kubeconfigs && kubeconfigs.length > 0) {
                 var kubeconfig = Buffer.from(kubeconfigs[0].value, 'base64');
                 console.log('KUBECONFIG:');
@@ -113,10 +114,8 @@ async function getKubeconfig(): Promise<string> {
     let managementEndpointUrl = credsObject["resourceManagerEndpointUrl"] || "https://management.azure.com/";
     let subscriptionId = credsObject["subscriptionId"];
     let azureSessionToken = await getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl);
-    
-    let isARCenabled = core.getInput('arc-enabled', { required: false });
     let kubeconfig;
-    if(isARCenabled === 'true') 
+    if (isARCenabled)
         kubeconfig = await getAKSKubeconfigForARC(azureSessionToken, subscriptionId, managementEndpointUrl);
     else
         kubeconfig = await getAKSKubeconfig(azureSessionToken, subscriptionId, managementEndpointUrl);
@@ -132,6 +131,10 @@ async function run() {
     fs.writeFileSync(kubeconfigPath, kubeconfig);
     issueCommand('set-env', { name: 'KUBECONFIG' }, kubeconfigPath);
     console.log('KUBECONFIG environment variable is set');
+    if (isARCenabled) {
+        nonInteractiveLogin.login();        
+        console.log('Kubeconfig is updated with AAD access token');
+    }
 }
 
 run().catch(core.setFailed);
