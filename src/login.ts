@@ -82,11 +82,13 @@ function getAKSKubeconfigForARC(azureSessionToken: string, subscriptionId: strin
             'Content-Type': 'application/json; charset=utf-8'
         }
         sendRequest(webRequest).then((response: WebResponse) => {
-            let kubeconfigs = response.body;
+            let kubeconfigs = response.body.kubeconfigs;
             console.log('RESPONSE:');
-            console.log(response.body);
+            console.log(kubeconfigs);
             if (kubeconfigs && kubeconfigs.length > 0) {
-                var kubeconfig = Buffer.from(kubeconfigs[0], 'base64');
+                var kubeconfig = Buffer.from(kubeconfigs[0].value, 'base64');
+                console.log('KUBECONFIG:');
+                console.log(kubeconfig.toString());
                 resolve(kubeconfig.toString());
             } else {
                 reject(JSON.stringify(response.body));
