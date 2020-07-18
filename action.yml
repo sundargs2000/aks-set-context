@@ -13,6 +13,10 @@ inputs:
     description: 'AKS Cluster Name'
     required: false
     default: ''
+  arc-enabled:
+    description: 'Is the cluster connected by ARC?'
+    required: false
+    default: 'false'
 branding:
   color: 'green' # optional, decorates the entry in the GitHub Marketplace
 runs:

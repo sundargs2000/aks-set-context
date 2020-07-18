@@ -70,6 +70,31 @@ function getAKSKubeconfig(azureSessionToken: string, subscriptionId: string, man
     });
 }
 
+function getAKSKubeconfigForARC(azureSessionToken: string, subscriptionId: string, managementEndpointUrl: string): Promise<string> {
+    let resourceGroupName = core.getInput('resource-group', { required: true });
+    let clusterName = core.getInput('cluster-name', { required: true });
+    return new Promise<string>((resolve, reject) => {
+        var webRequest = new WebRequest();
+        webRequest.method = 'POST';
+        webRequest.uri = `${managementEndpointUrl}/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.Kubernetes/connectedClusters/${clusterName}/listClusterUserCredentials?api-version=2020-01-01-preview`;
+        webRequest.headers = {
+            'Authorization': 'Bearer ' + azureSessionToken,
+            'Content-Type': 'application/json; charset=utf-8'
+        }
+        sendRequest(webRequest).then((response: WebResponse) => {
+            let kubeconfigs = response.body;
+            console.log('RESPONSE:');
+            console.log(response.body);
+            if (kubeconfigs && kubeconfigs.length > 0) {
+                var kubeconfig = Buffer.from(kubeconfigs[0], 'base64');
+                resolve(kubeconfig.toString());
+            } else {
+                reject(JSON.stringify(response.body));
+            }
+        }).catch(reject);
+    });
+}
+
 async function getKubeconfig(): Promise<string> {
     let creds = core.getInput('creds', { required: true });
     let credsObject: { [key: string]: string; };
@@ -86,7 +111,14 @@ async function getKubeconfig(): Promise<string> {
     let managementEndpointUrl = credsObject["resourceManagerEndpointUrl"] || "https://management.azure.com/";
     let subscriptionId = credsObject["subscriptionId"];
     let azureSessionToken = await getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl);
-    let kubeconfig = await getAKSKubeconfig(azureSessionToken, subscriptionId, managementEndpointUrl);
+    
+    let isARCenabled = core.getInput('arc-enabled', { required: false });
+    let kubeconfig;
+    if(isARCenabled === 'true') 
+        kubeconfig = await getAKSKubeconfigForARC(azureSessionToken, subscriptionId, managementEndpointUrl);
+    else
+        kubeconfig = await getAKSKubeconfig(azureSessionToken, subscriptionId, managementEndpointUrl);
+
     return kubeconfig;
 }
 
