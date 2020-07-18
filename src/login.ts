@@ -132,7 +132,7 @@ async function run() {
     issueCommand('set-env', { name: 'KUBECONFIG' }, kubeconfigPath);
     console.log('KUBECONFIG environment variable is set');
     if (isARCenabled) {
-        nonInteractiveLogin.login();        
+        await nonInteractiveLogin.login(kubeconfigPath);
         console.log('Kubeconfig is updated with AAD access token');
     }
 }
