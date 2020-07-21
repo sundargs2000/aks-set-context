@@ -6,7 +6,8 @@ import { WebRequest, WebRequestOptions, WebResponse, sendRequest } from "./clien
 import * as querystring from 'querystring';
 import * as nonInteractiveLogin from './non-interactive-login';
 
-const isARCenabled = core.getInput('arc-enabled', { required: false }) === 'true' ? true : false;
+let isConnectedCluster;
+const SUCCESS = 200;
 
 function getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl: string): Promise<string> {
 
@@ -98,6 +99,28 @@ function getAKSKubeconfigForARC(azureSessionToken: string, subscriptionId: strin
     });
 }
 
+function checkClusterType(azureSessionToken: string, subscriptionId: string, managementEndpointUrl: string): Promise<boolean> {
+    let resourceGroupName = core.getInput('resource-group', { required: true });
+    let clusterName = core.getInput('cluster-name', { required: true });
+    return new Promise<boolean>((resolve, reject) => {
+        var webRequest = new WebRequest();
+        webRequest.method = 'GET';
+        webRequest.uri = `${managementEndpointUrl}/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.Kubernetes/connectedClusters/${clusterName}?api-version=2020-01-01-preview`;
+        webRequest.headers = {
+            'Authorization': 'Bearer ' + azureSessionToken,
+            'Content-Type': 'application/json; charset=utf-8'
+        }
+        sendRequest(webRequest).then((response: WebResponse) => {
+            let statusCode = response.statusCode;
+            if (statusCode == SUCCESS) {
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        }).catch(reject);
+    });
+}
+
 async function getKubeconfig(): Promise<string> {
     let creds = core.getInput('creds', { required: true });
     let credsObject: { [key: string]: string; };
@@ -114,8 +137,10 @@ async function getKubeconfig(): Promise<string> {
     let managementEndpointUrl = credsObject["resourceManagerEndpointUrl"] || "https://management.azure.com/";
     let subscriptionId = credsObject["subscriptionId"];
     let azureSessionToken = await getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl);
+    
+    isConnectedCluster = await checkClusterType(azureSessionToken, subscriptionId, managementEndpointUrl);
     let kubeconfig;
-    if (isARCenabled)
+    if (isConnectedCluster)
         kubeconfig = await getAKSKubeconfigForARC(azureSessionToken, subscriptionId, managementEndpointUrl);
     else
         kubeconfig = await getAKSKubeconfig(azureSessionToken, subscriptionId, managementEndpointUrl);
@@ -124,6 +149,7 @@ async function getKubeconfig(): Promise<string> {
 }
 
 async function run() {
+
     let kubeconfig = await getKubeconfig();
     const runnerTempDirectory = process.env['RUNNER_TEMP']; // Using process.env until the core libs are updated
     const kubeconfigPath = path.join(runnerTempDirectory, `kubeconfig_${Date.now()}`);
@@ -131,7 +157,7 @@ async function run() {
     fs.writeFileSync(kubeconfigPath, kubeconfig);
     issueCommand('set-env', { name: 'KUBECONFIG' }, kubeconfigPath);
     console.log('KUBECONFIG environment variable is set');
-    if (isARCenabled) {
+    if (isConnectedCluster) {
         await nonInteractiveLogin.login(kubeconfigPath);
         console.log('Kubeconfig is updated with AAD access token');
     }

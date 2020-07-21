@@ -13,10 +13,6 @@ inputs:
     description: 'AKS Cluster Name'
     required: false
     default: ''
-  arc-enabled:
-    description: 'Is the cluster connected by ARC?'
-    required: false
-    default: 'false'
   aad-creds:
     description: 'Azure credentials of the account containing AAD cluster i.e. output of `az ad sp create-for-rbac --skip-assignment`'
     required: false
