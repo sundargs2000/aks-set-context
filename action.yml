@@ -3,7 +3,7 @@ description: 'Sets the kubeconfig on the machine to communicate with the Azure K
 inputs: 
   creds:
     description: 'Azure credentials i.e. output of `az ad sp create-for-rbac --sdk-auth`'
-    required: true
+    required: false
     default: ''
   resource-group:
     description: 'Resource Group Name'
