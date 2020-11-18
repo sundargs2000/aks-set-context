@@ -4,6 +4,20 @@ import * as fs from 'fs';
 import { WebRequest, WebRequestOptions, WebResponse, sendRequest } from "./client";
 import * as querystring from 'querystring';
 
+// What more details should be captured? Region
+interface AksResourceContext {
+    subscriptionId: string;
+    resourceGroup: string;
+    clusterName: string;
+    sessionToken: string;
+    managementUrl: string;
+}
+
+interface AksContext {
+    kubeconfig: string;
+    resourceContext: AksResourceContext;
+}
+
 function getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl : string): Promise<string> {
 
     if (!servicePrincipalId || !servicePrincipalKey || !tenantId || !authorityUrl) {
@@ -46,9 +60,7 @@ function getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, 
     });
 }
 
-function getAKSKubeconfig(azureSessionToken: string, subscriptionId: string, managementEndpointUrl: string): Promise<string> {
-    let resourceGroupName = core.getInput('resource-group', { required: true });
-    let clusterName = core.getInput('cluster-name', { required: true });
+function getAKSKubeconfig(azureSessionToken: string, subscriptionId: string, resourceGroupName: string, clusterName: string, managementEndpointUrl: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
         var webRequest = new WebRequest();
         webRequest.method = 'GET';
@@ -69,7 +81,7 @@ function getAKSKubeconfig(azureSessionToken: string, subscriptionId: string, man
     });
 }
 
-async function getKubeconfig(): Promise<string> {
+async function getAKSContext(): Promise<AksContext> {
     let creds = core.getInput('creds', { required: true });
     let credsObject: { [key: string]: string; };
     try {
@@ -82,15 +94,32 @@ async function getKubeconfig(): Promise<string> {
     let servicePrincipalKey = credsObject["clientSecret"];
     let tenantId = credsObject["tenantId"];
     let authorityUrl = credsObject["activeDirectoryEndpointUrl"] || "https://login.microsoftonline.com";
-    let managementEndpointUrl = credsObject["resourceManagerEndpointUrl"] || "https://management.azure.com/";
+    let resourceManagerEndpointUrl = credsObject["resourceManagerEndpointUrl"] || "https://management.azure.com/";
+    let managementEndpointUrl = credsObject["managementEndpointUrl"] || "https://management.azure.com/";
     let subscriptionId = credsObject["subscriptionId"];
-    let azureSessionToken = await getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl);
-    let kubeconfig = await getAKSKubeconfig(azureSessionToken, subscriptionId, managementEndpointUrl);
-    return kubeconfig;
+    let azureSessionToken = await getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, resourceManagerEndpointUrl);
+    let resourceGroupName = core.getInput('resource-group', { required: true });
+    let clusterName = core.getInput('cluster-name', { required: true });
+    // let kubeconfig = await getAKSKubeconfig(azureSessionToken, subscriptionId, resourceGroupName, clusterName, managementEndpointUrl);
+    let kubeconfig = "placeholder";
+
+    let aksResourceContext: AksResourceContext = {
+        subscriptionId: subscriptionId,
+        resourceGroup: resourceGroupName,
+        clusterName: clusterName,
+        sessionToken: azureSessionToken,
+        managementUrl: managementEndpointUrl
+    };
+
+    let aksContext: AksContext = {
+        kubeconfig: kubeconfig,
+        resourceContext: aksResourceContext
+    };
+
+    return aksContext;
 }
 
-async function run() {
-    let kubeconfig = await getKubeconfig();
+function exportKubeConfig(kubeconfig: string) {
     const runnerTempDirectory = process.env['RUNNER_TEMP']; // Using process.env until the core libs are updated
     const kubeconfigPath = path.join(runnerTempDirectory, `kubeconfig_${Date.now()}`);
     core.debug(`Writing kubeconfig contents to ${kubeconfigPath}`);
@@ -98,6 +127,21 @@ async function run() {
     fs.chmodSync(kubeconfigPath, '600');
     core.exportVariable('KUBECONFIG', kubeconfigPath);
     console.log('KUBECONFIG environment variable is set');
+}
+
+function exportResourceContext(aksResourceContext: AksResourceContext) {
+    const runnerTempDirectory = process.env['RUNNER_TEMP']; // Using process.env until the core libs are updated
+    const aksResourceContextPath = path.join(runnerTempDirectory, `aks-resource-context.json`);
+    console.log(`Writing AKS resource context contents to ${aksResourceContextPath}`);
+    fs.writeFileSync(aksResourceContextPath, JSON.stringify(aksResourceContext));
+    fs.chmodSync(aksResourceContextPath, '600');
+    console.log('AKS resource context exported.');
+}
+
+async function run() {
+    let aksContext = await getAKSContext();
+    exportKubeConfig(aksContext.kubeconfig);
+    exportResourceContext(aksContext.resourceContext);
 }
 
 run().catch(core.setFailed);
