@@ -100,8 +100,7 @@ async function getAKSContext(): Promise<AksContext> {
     let azureSessionToken = await getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, resourceManagerEndpointUrl);
     let resourceGroupName = core.getInput('resource-group', { required: true });
     let clusterName = core.getInput('cluster-name', { required: true });
-    // let kubeconfig = await getAKSKubeconfig(azureSessionToken, subscriptionId, resourceGroupName, clusterName, managementEndpointUrl);
-    let kubeconfig = "placeholder";
+    let kubeconfig = await getAKSKubeconfig(azureSessionToken, subscriptionId, resourceGroupName, clusterName, managementEndpointUrl);
 
     let aksResourceContext: AksResourceContext = {
         subscriptionId: subscriptionId,
