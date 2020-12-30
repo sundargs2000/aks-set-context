@@ -118,7 +118,7 @@ async function setAksResourceContext() {
     let resourceManagerEndpointUrl = credsObject["resourceManagerEndpointUrl"] || "https://management.azure.com/";
     let managementEndpointUrl = credsObject["managementEndpointUrl"] || "https://management.azure.com/";
     let subscriptionId = credsObject["subscriptionId"];
-    let azureSessionToken = await getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, resourceManagerEndpointUrl);
+    let azureSessionToken = await getAzureAccessToken(servicePrincipalId, servicePrincipalKey, tenantId, authorityUrl, managementEndpointUrl);
     let resourceGroupName = core.getInput('resource-group', { required: true });
     let clusterName = core.getInput('cluster-name', { required: true });
 
@@ -127,7 +127,7 @@ async function setAksResourceContext() {
         resourceGroup: resourceGroupName,
         clusterName: clusterName,
         sessionToken: azureSessionToken,
-        managementUrl: managementEndpointUrl
+        managementUrl: resourceManagerEndpointUrl
     };
     
     const runnerTempDirectory = process.env['RUNNER_TEMP']; // Using process.env until the core libs are updated

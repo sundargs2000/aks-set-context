@@ -4,7 +4,7 @@
   "private": true,
   "main": "lib/login.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc --rootDir ./src --outDir ./lib"
   },
   "keywords": [
     "actions",
